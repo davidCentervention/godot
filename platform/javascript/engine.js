@@ -11,6 +11,7 @@
 	var engine = Engine;
 
 	var DOWNLOAD_ATTEMPTS_MAX = 4;
+	var USING_WASM = engine.USING_WASM;
 
 	var basePath = null;
 	var wasmFilenameExtensionOverride = null;
@@ -47,6 +48,7 @@
 
 		var initPromise = null;
 		var unloadAfterInit = true;
+		var memorySize = 268435456;
 
 		var preloadedFiles = [];
 
@@ -74,7 +76,7 @@
 			return initPromise;
 		};
 
-		function instantiate(wasmBuf) {
+		function instantiate(initializer) {
 
 			var rtenvProps = {
 				engine: this,
@@ -84,12 +86,21 @@
 				rtenvProps.print = stdout;
 			if (typeof stderr === 'function')
 				rtenvProps.printErr = stderr;
-			rtenvProps.instantiateWasm = function(imports, onSuccess) {
-				WebAssembly.instantiate(wasmBuf, imports).then(function(result) {
-					onSuccess(result.instance);
-				});
-				return {};
-			};
+
+			if (typeof WebAssembly === 'object' && initializer instanceof ArrayBuffer) {
+				rtenvProps.instantiateWasm = function(imports, onSuccess) {
+					WebAssembly.instantiate(wasmBuf, imports).then(function(result) {
+						onSuccess(result.instance);
+					});
+					return {};
+				};
+			} else if (initializer.asm && initializer.mem) {
+				rtenvProps.asm = initializer.asm;
+				rtenvProps.memoryInitializerRequest = initializer.mem;
+				rtenvProps.TOTAL_MEMORY = memorySize;
+			} else {
+				throw new Error("Invalid initializer");
+			}
 
 			return new Promise(function(resolve, reject) {
 				rtenvProps.onRuntimeInitialized = resolve;
@@ -250,6 +261,10 @@
 			canvas = elem;
 		};
 
+		this.setMemorySize = function(size) {
+			memorySize = size;
+		};
+
 		this.setExecutableName = function(newName) {
 
 			executableName = newName;
@@ -324,19 +339,62 @@
 
 		if (newBasePath !== undefined) basePath = getBasePath(newBasePath);
 		if (engineLoadPromise === null) {
-			if (typeof WebAssembly !== 'object')
-				return Promise.reject(new Error("Browser doesn't support WebAssembly"));
-			// TODO cache/retrieve module to/from idb
-			engineLoadPromise = loadPromise(basePath + '.' + (wasmFilenameExtensionOverride || 'wasm')).then(function(xhr) {
-				return xhr.response;
-			});
-			engineLoadPromise = engineLoadPromise.catch(function(err) {
-				engineLoadPromise = null;
-				throw err;
-			});
+			if (USING_WASM) {
+				if (typeof WebAssembly !== 'object')
+					return Promise.reject(new Error("Browser doesn't support WebAssembly"));
+				// TODO cache/retrieve module to/from idb
+				engineLoadPromise = loadPromise(basePath + '.' + (wasmFilenameExtensionOverride || 'wasm')).then(function(xhr) {
+					return xhr.response;
+				});
+				engineLoadPromise = engineLoadPromise.catch(function(err) {
+					engineLoadPromise = null;
+					throw err;
+				});
+			} else {
+				var asmjsPromise = loadPromise(basePath + '.asm.js').then(function(xhr) {
+					return asmjsModulePromise(xhr.response);
+				});
+				var memPromise = loadPromise(basePath + '.mem');
+				engineLoadPromise = Promise.all([asmjsPromise, memPromise]).then(function(results) {
+					return {
+						asm: results[0],
+						mem: results[1],
+					};
+				});
+			}
 		}
 		return engineLoadPromise;
 	};
+
+	function asmjsModulePromise(module) {
+		var elem = document.createElement('script');
+		var script = new Blob([
+			'Engine.asm = (function() { var Module = {}',
+			module,
+			'return Module.asm; })();'
+		]);
+
+		var url = URL.createObjectURL(script);
+		elem.src = url;
+
+		return new Promise(function (resolve, reject) {
+			elem.addEventListener('load', function() {
+				URL.revokeObjectURL(url);
+				var asm = Engine.asm;
+				Engine.asm = undefined;
+				setTimeout(function() {
+					resolve(asm);
+				}, 1);
+			});
+
+			elem.addEventListener('error', function(err) {
+				URL.revokeObjectURL(url);
+				reject(err);
+			});
+
+			document.body.appendChild(elem);
+		});
+	}
 
 	Engine.unload = function() {
 		engineLoadPromise = null;
@@ -399,6 +457,7 @@
 				break;
 
 			case 'error':
+			case 'timeout':
 				if (++tracker[file].attempts >= DOWNLOAD_ATTEMPTS_MAX) {
 					tracker[file].final = true;
 					reject(new Error("Failed loading file '" + file + "'"));
