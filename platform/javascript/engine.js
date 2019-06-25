@@ -369,9 +369,9 @@
 	function asmjsModulePromise(module) {
 		var elem = document.createElement('script');
 		var script = new Blob([
-			'Engine.asm = (function() { var Module = {}',
+			'Engine.asm = (function() { var Module = {}; ',
 			module,
-			'return Module.asm; })();'
+			'; return Module.asm; })();'
 		]);
 
 		var url = URL.createObjectURL(script);
