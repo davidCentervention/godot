@@ -59,7 +59,6 @@ public:
 	virtual void get_preset_features(const Ref<EditorExportPreset> &p_preset, List<String> *r_features);
 
 	virtual void get_export_options(List<ExportOption> *r_options);
-	virtual bool get_option_visibility(const String &p_option, const Map<StringName, Variant> &p_options) const;
 
 	virtual String get_name() const;
 	virtual String get_os_name() const;
@@ -94,12 +93,7 @@ void EditorExportPlatformJavaScript::_fix_html(Vector<uint8_t> &p_html, const Re
 	String str_export;
 	Vector<String> lines = str_template.split("\n");
 
-	int memory_mb;
-	if (p_preset->get("options/target").operator int() != TARGET_ASMJS) {
-		memory_mb = 1 << 4;
-	} else {
-		memory_mb = 1 << (p_preset->get("options/memory_size").operator int() + 5);
-	}
+	int memory_mb = 1 << (p_preset->get("options/asmjs_memory_size").operator int() + 5);
 
 	for (int i = 0; i < lines.size(); i++) {
 
@@ -138,22 +132,13 @@ void EditorExportPlatformJavaScript::get_preset_features(const Ref<EditorExportP
 }
 
 void EditorExportPlatformJavaScript::get_export_options(List<ExportOption> *r_options) {
-	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "options/target", PROPERTY_HINT_ENUM, "WebAssembly,asm.js"), TARGET_WEBASSEMBLY)); // S3TC
-	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "options/memory_size", PROPERTY_HINT_ENUM, "32 MB,64 MB,128 MB,256 MB,512 MB,1 GB"), 3)); // S3TC
+	r_options->push_back(ExportOption(PropertyInfo(Variant::INT, "options/asmjs_memory_size", PROPERTY_HINT_ENUM, "32 MB,64 MB,128 MB,256 MB,512 MB,1 GB"), 3)); // S3TC
 	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "vram_texture_compression/for_desktop"), true)); // S3TC
 	r_options->push_back(ExportOption(PropertyInfo(Variant::BOOL, "vram_texture_compression/for_mobile"), false)); // ETC or ETC2, depending on renderer
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "html/custom_html_shell", PROPERTY_HINT_FILE, "*.html"), ""));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "html/head_include", PROPERTY_HINT_MULTILINE_TEXT), ""));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "custom_template/release", PROPERTY_HINT_GLOBAL_FILE, "*.zip"), ""));
 	r_options->push_back(ExportOption(PropertyInfo(Variant::STRING, "custom_template/debug", PROPERTY_HINT_GLOBAL_FILE, "*.zip"), ""));
-}
-
-bool EditorExportPlatformJavaScript::get_option_visibility(const String &p_option, const Map<StringName, Variant> &p_options) const {
-
-	if (p_option == "options/memory_size") {
-		return p_options["options/target"].operator int() == TARGET_ASMJS;
-	}
-	return true;
 }
 
 String EditorExportPlatformJavaScript::get_name() const {
@@ -297,15 +282,9 @@ Error EditorExportPlatformJavaScript::export_project(const Ref<EditorExportPrese
 			_fix_html(data, p_preset, p_path.get_file().get_basename(), p_debug);
 			file = p_path.get_file();
 
-		} else if (file == "godot.js") {
-			file = p_path.get_file().get_basename() + ".js";
-		} else if (file == "godot.wasm") {
-			file = p_path.get_file().get_basename() + ".wasm";
-		} else if (file == "godot.asm.js") {
-			file = p_path.get_file().get_basename() + ".asm.js";
-		} else if (file == "godot.mem") {
-			file = p_path.get_file().get_basename() + ".mem";
 		}
+		
+		file = file.replace("godot", p_path.get_file().get_basename());
 
 		String dst = p_path.get_base_dir().plus_file(file);
 		FileAccess *f = FileAccess::open(dst, FileAccess::WRITE);

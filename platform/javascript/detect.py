@@ -18,7 +18,6 @@ def get_opts():
     return [
         # eval() can be a security concern, so it can be disabled.
         BoolVariable('javascript_eval', 'Enable JavaScript eval interface', True),
-        BoolVariable('wasm', 'Compile to WebAssembly', True),
     ]
 
 
@@ -122,20 +121,6 @@ def configure(env):
         env.Append(CPPDEFINES=['JAVASCRIPT_EVAL_ENABLED'])
 
     ## Link flags
-
-    if env['wasm']: 
-        env.Append(LINKFLAGS=['-s', 'BINARYEN=1'])
-        env.Append(LINKFLAGS=['-s', 'BINARYEN_TRAP_MODE=\'clamp\''])
-
-        # Allow increasing memory buffer size during runtime. This is efficient
-        # when using WebAssembly (in comparison to asm.js) and works well for
-        # us since we don't know requirements at compile-time.
-        env.Append(LINKFLAGS=['-s', 'ALLOW_MEMORY_GROWTH=1'])
-    else:
-        env.Append(LINKFLAGS=['-s', 'ASM_JS=1'])
-        env.Append(LINKFLAGS=['-s', 'WASM=0'])
-        env.Append(LINKFLAGS=['--separate-asm'])
-        env.Append(LINKFLAGS=['--memory-init-file', '1'])
 
     # This setting just makes WebGL 2 APIs available, it does NOT disable WebGL 1.
     env.Append(LINKFLAGS=['-s', 'USE_WEBGL2=1'])
