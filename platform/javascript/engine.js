@@ -4,7 +4,7 @@ var Engine = {};
 	var engine = Engine;
 
 	var DOWNLOAD_ATTEMPTS_MAX = 4;
-	var USING_WASM = typeof WebAssembly === "object" && !navigator.platform.match(/iPad|iPhone|iPod/);
+	var CAN_USE_WEB_ASSEMBLY = typeof WebAssembly === "object" && !navigator.platform.match(/iPad|iPhone|iPod/);
 
 	var basePath = null;
 	var wasmFilenameExtensionOverride = null;
@@ -300,7 +300,9 @@ var Engine = {};
 			stderr = printErr;
 		};
 
-
+		this.isUsingWebAssembly = function() {
+			return CAN_USE_WEB_ASSEMBLY;
+		};
 	}; // Engine()
 
 	Engine.RuntimeEnvironment = engine.RuntimeEnvironment;
@@ -332,7 +334,7 @@ var Engine = {};
 		if (newBasePath !== undefined) basePath = getBasePath(newBasePath);
 		if (engineLoadPromise === null) {
 
-			if (USING_WASM) {
+			if (CAN_USE_WEB_ASSEMBLY) {
 				modulePath = basePath + '.module-wasm.js';
 
 				// TODO: cache/retrieve module to/from idb

@@ -35,10 +35,8 @@
 #include "platform/javascript/logo.gen.h"
 #include "platform/javascript/run_icon.gen.h"
 
-#define EXPORT_TEMPLATE_WEBASSEMBLY_RELEASE "webassembly_release.zip"
-#define EXPORT_TEMPLATE_WEBASSEMBLY_DEBUG "webassembly_debug.zip"
-#define EXPORT_TEMPLATE_ASMJS_RELEASE "asmjs_release.zip"
-#define EXPORT_TEMPLATE_ASMJS_DEBUG "asmjs_debug.zip"
+#define EXPORT_TEMPLATE_WEBASSEMBLY_RELEASE "javascript_release.zip"
+#define EXPORT_TEMPLATE_WEBASSEMBLY_DEBUG "javascript_debug.zip"
 
 class EditorExportPlatformJavaScript : public EditorExportPlatform {
 
@@ -51,11 +49,6 @@ class EditorExportPlatformJavaScript : public EditorExportPlatform {
 	void _fix_html(Vector<uint8_t> &p_html, const Ref<EditorExportPreset> &p_preset, const String &p_name, bool p_debug);
 
 public:
-	enum Target {
-		TARGET_WEBASSEMBLY,
-		TARGET_ASMJS
-	};
-
 	virtual void get_preset_features(const Ref<EditorExportPreset> &p_preset, List<String> *r_features);
 
 	virtual void get_export_options(List<ExportOption> *r_options);
@@ -283,7 +276,7 @@ Error EditorExportPlatformJavaScript::export_project(const Ref<EditorExportPrese
 			file = p_path.get_file();
 
 		}
-		
+
 		file = file.replace("godot", p_path.get_file().get_basename());
 
 		String dst = p_path.get_base_dir().plus_file(file);
